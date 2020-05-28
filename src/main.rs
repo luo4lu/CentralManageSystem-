@@ -19,6 +19,8 @@ async fn main() -> std::io::Result<()> {
             .service(meta_manage::update_cert)
             .service(meta_manage::get_cert)
             .service(dcds_regist_manage::dcds_reg_manage)
+            .service(dcds_regist_manage::new_quota_manage)
+            .service(dcds_regist_manage::get_dcds_allquota)
     })
     .bind("127.0.0.1:8077")?
     .run()
