@@ -1,9 +1,9 @@
-use actix_web::{ App, HttpServer};
+use actix_web::{App, HttpServer};
 use log::Level;
 
-mod meta_manage;
-mod dcds_regist_manage;
 mod config;
+mod dcds_regist_manage;
+mod meta_manage;
 pub mod response;
 
 #[actix_rt::main]
