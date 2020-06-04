@@ -53,19 +53,42 @@ pub async fn dcds_reg_manage(
     //数据库存储操作
     //状态值
     let state = String::from("begin");
-    let insert_statement = conn
+    let insert_statement = match conn
         .prepare(
             "INSERT INTO agents (id, cert, extra, state, create_time, update_time) VALUES ($1,
                 $2, $3, $4, now(), now())",
         )
         .await
-        .unwrap();
-    conn.execute(
-        &insert_statement,
-        &[&uid_str, &qstr.cert, &qstr.extra, &state],
-    )
-    .await
-    .unwrap();
+    {
+        Ok(s) => {
+            info!("database command success!");
+            s
+        }
+        Err(error) => {
+            warn!("database command failed: {:?}", error);
+            return HttpResponse::Ok().json(ResponseBody::<String>::database_runing_error(Some(
+                error.to_string(),
+            )));
+        }
+    };
+    match conn
+        .execute(
+            &insert_statement,
+            &[&uid_str, &qstr.cert, &qstr.extra, &state],
+        )
+        .await
+    {
+        Ok(s) => {
+            info!("database parameter success!");
+            s
+        }
+        Err(error) => {
+            warn!("database parameter failed: {:?}", error);
+            return HttpResponse::Ok().json(ResponseBody::<String>::database_runing_error(Some(
+                error.to_string(),
+            )));
+        }
+    };
 
     //返回响应字段
     HttpResponse::Ok().json(ResponseBody::new_success(Some(DcdsRegistResponse {
@@ -116,26 +139,49 @@ pub async fn new_quota_manage(
         );
         return HttpResponse::Ok().json(ResponseBody::<()>::new_json_parse_error());
     }
-    let insert_statement = conn
+    let insert_statement = match conn
         .prepare(
             "INSERT INTO quota_admin (id, aid, extra, value, type, state, create_time,
                 update_time) VALUES ($1, $2, $3, $4, $5, $6, now(), now())",
         )
         .await
-        .unwrap();
-    conn.execute(
-        &insert_statement,
-        &[
-            &uid_str,
-            &qstr.aid,
-            &qstr.extra,
-            &qstr.value,
-            &qstr.ttype,
-            &state,
-        ],
-    )
-    .await
-    .unwrap();
+    {
+        Ok(s) => {
+            info!("database command success!");
+            s
+        }
+        Err(error) => {
+            warn!("database command failed: {:?}", error);
+            return HttpResponse::Ok().json(ResponseBody::<String>::database_runing_error(Some(
+                error.to_string(),
+            )));
+        }
+    };
+    match conn
+        .execute(
+            &insert_statement,
+            &[
+                &uid_str,
+                &qstr.aid,
+                &qstr.extra,
+                &qstr.value,
+                &qstr.ttype,
+                &state,
+            ],
+        )
+        .await
+    {
+        Ok(s) => {
+            info!("database parameter success!");
+            s
+        }
+        Err(error) => {
+            warn!("database parameter failed: {:?}", error);
+            return HttpResponse::Ok().json(ResponseBody::<String>::database_runing_error(Some(
+                error.to_string(),
+            )));
+        }
+    };
 
     //返回响应
     HttpResponse::Ok().json(ResponseBody::<()>::new_success(None))
@@ -227,17 +273,38 @@ pub async fn get_dcds_allquota(
     uid_hasher.update(&(rng.gen::<[u8; 32]>()));
     let uid_str = uid_hasher.finalize().encode_hex::<String>();
     //将数据插入数据库
-    let insert_statement = conn
+    let insert_statement = match conn
         .prepare(
             "INSERT INTO quota_delivery (id, aid, issue, issue_info, create_time, update_time) VALUES 
             ($1, $2, $3, $4, now(), now())",
-        ).await.unwrap();
-    conn.execute(
-        &insert_statement,
-        &[&uid_str, &qstr.aid, &qstr.issue, &jsonb_issue],
-    )
-    .await
-    .unwrap();
+        ).await{
+            Ok(s) => {
+                info!("database command success!");
+                s
+            }
+            Err(error) =>{
+                warn!("database command failed: {:?}",error);
+                return HttpResponse::Ok().json(ResponseBody::<String>::database_runing_error(Some(error.to_string())));
+            }
+        };
+    match conn
+        .execute(
+            &insert_statement,
+            &[&uid_str, &qstr.aid, &qstr.issue, &jsonb_issue],
+        )
+        .await
+    {
+        Ok(s) => {
+            info!("database parameter success!");
+            s
+        }
+        Err(error) => {
+            warn!("database parameter failed: {:?}", error);
+            return HttpResponse::Ok().json(ResponseBody::<String>::database_runing_error(Some(
+                error.to_string(),
+            )));
+        }
+    };
 
     HttpResponse::Ok().json(ResponseBody::new_success(Some(response_data)))
 }

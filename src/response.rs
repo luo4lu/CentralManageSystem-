@@ -52,4 +52,13 @@ impl<T> ResponseBody<T> {
             data: None,
         }
     }
+
+    ///数据库语句执行失败
+    pub fn database_runing_error(data: Option<T>) -> Self {
+        ResponseBody {
+            code: 90005,
+            message: String::from("Database command failed to execute, check command or parameter"),
+            data,
+        }
+    }
 }
