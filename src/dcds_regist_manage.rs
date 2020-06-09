@@ -23,6 +23,8 @@ use deadpool_postgres::Pool;
 pub struct DcdsRegistRequest {
     cert: String,
     extra: serde_json::Value,
+    #[serde(rename = "type")]
+    t: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -31,7 +33,7 @@ pub struct DcdsRegistResponse {
     aid: String,
 }
 
-#[post("/api/dcds")]
+#[post("/api/agent")]
 pub async fn dcds_reg_manage(
     data: web::Data<Pool>,
     qstr: web::Json<DcdsRegistRequest>,
@@ -46,6 +48,7 @@ pub async fn dcds_reg_manage(
     //use Sm3算法实现hash转换
     let mut uid_hasher = Sm3::default();
     uid_hasher.update(&qstr.cert);
+    uid_hasher.update(&qstr.t);
     uid_hasher.update(&local_time.to_string());
     uid_hasher.update(&(rng.gen::<[u8; 32]>()));
     let uid_str = uid_hasher.finalize().encode_hex::<String>();
@@ -55,8 +58,8 @@ pub async fn dcds_reg_manage(
     let state = String::from("begin");
     let insert_statement = match conn
         .prepare(
-            "INSERT INTO agents (id, cert, extra, state, create_time, update_time) VALUES ($1,
-                $2, $3, $4, now(), now())",
+            "INSERT INTO agents (id, cert, extra, state, type, create_time, update_time) VALUES ($1,
+                $2, $3, $4, $5, now(), now())",
         )
         .await
     {
@@ -74,7 +77,7 @@ pub async fn dcds_reg_manage(
     match conn
         .execute(
             &insert_statement,
-            &[&uid_str, &qstr.cert, &qstr.extra, &state],
+            &[&uid_str, &qstr.cert, &qstr.extra, &state, &qstr.t],
         )
         .await
     {
@@ -106,7 +109,7 @@ pub struct QuotaManageRequest {
     extra: serde_json::Value,
 }
 
-#[post("/api/dcds/{id}/quota/")]
+#[post("/api/dcds/{id}/quota")]
 pub async fn new_quota_manage(
     data: web::Data<Pool>,
     qstr: web::Json<QuotaManageRequest>,
@@ -190,11 +193,10 @@ pub async fn new_quota_manage(
 ///额度请求结构体
 #[derive(Deserialize, Debug)]
 pub struct DcdsQuotaRequest {
-    aid: String,
     issue: String,
 }
 
-#[post("/api/dcds/qouta_issue/")]
+#[post("/api/dcds/qouta_issue")]
 pub async fn get_dcds_allquota(
     data: web::Data<Pool>,
     config: web::Data<ConfigPath>,
@@ -250,7 +252,29 @@ pub async fn get_dcds_allquota(
     //入参额度请求反序列化得到指定格式的值
     let deser_vec = Vec::<u8>::from_hex(&qstr.issue).unwrap();
     let mut issue_quota = IssueQuotaRequestWrapper::from_bytes(&deser_vec).unwrap();
-
+    //通过cert查询aid
+    let cert = issue_quota.get_cert().as_ref().unwrap();
+    let cert_str = cert.to_bytes().encode_hex::<String>();
+    let select_statement = match conn
+        .query("SELECT * from agents where cert = $1", &[&cert_str])
+        .await
+    {
+        Ok(row) => {
+            info!("select agents success!{:?}", row);
+            row
+        }
+        Err(error) => {
+            warn!("select agents failed:{:?}", error);
+            return HttpResponse::Ok().json(ResponseBody::<String>::database_runing_error(Some(
+                error.to_string(),
+            )));
+        }
+    };
+    if select_statement.is_empty() {
+        warn!("SELECT check cert failed,please check cert value");
+        return HttpResponse::Ok().json(ResponseBody::<()>::database_build_error());
+    }
+    let aid: String = select_statement[0].get(0);
     //验证签名
     if issue_quota.verfiy_kvhead().is_ok() {
         info!("true");
@@ -267,7 +291,7 @@ pub async fn get_dcds_allquota(
     let local_time = Local::now();
     //use Sm3算法实现hash转换
     let mut uid_hasher = Sm3::default();
-    uid_hasher.update(&qstr.aid);
+    uid_hasher.update(&aid);
     uid_hasher.update(&qstr.issue);
     uid_hasher.update(&local_time.to_string());
     uid_hasher.update(&(rng.gen::<[u8; 32]>()));
@@ -290,7 +314,7 @@ pub async fn get_dcds_allquota(
     match conn
         .execute(
             &insert_statement,
-            &[&uid_str, &qstr.aid, &qstr.issue, &jsonb_issue],
+            &[&uid_str, &aid, &qstr.issue, &jsonb_issue],
         )
         .await
     {
