@@ -6,7 +6,8 @@ create table agents(
     extra jsonb NOT NULL,
     state varchar(255) NOT NULL,
     create_time timestamp NOT NULL,
-    update_time timestamp NOT NULL);
+    update_time timestamp NOT NULL,
+    type varchar(255) NOT NULL);
 
 create table quota_admin(
     id varchar(255) PRIMARY KEY NOT NULL,
