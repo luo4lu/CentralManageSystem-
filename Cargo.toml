@@ -1,5 +1,5 @@
 [package]
-name = "central_manage_system"
+name = "central-manage-system"
 version = "0.1.0"
 authors = ["luo4lu <luo4lu@163.com>"]
 edition = "2018"
