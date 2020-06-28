@@ -9,7 +9,6 @@ mod config_command;
 mod dcds_regist_manage;
 mod get_quota_infor;
 mod meta_manage;
-mod get_quota_infor;
 pub mod response;
 
 #[actix_rt::main]
