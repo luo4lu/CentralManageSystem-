@@ -1,6 +1,6 @@
 use crate::config::ConfigPath;
 use crate::response::ResponseBody;
-use actix_web::{post, web, HttpResponse, Responder};
+use actix_web::{post, web, HttpResponse, HttpRequest, Responder};
 use asymmetric_crypto::hasher::sha3::Sha3;
 use asymmetric_crypto::hasher::sm3::Sm3;
 use asymmetric_crypto::keypair;
@@ -37,6 +37,7 @@ pub struct DcdsRegistResponse {
 pub async fn dcds_reg_manage(
     data: web::Data<Pool>,
     qstr: web::Json<DcdsRegistRequest>,
+    req_head: HttpRequest,
 ) -> impl Responder {
     //数据库连接请求句柄获取
     let conn = data.get().await.unwrap();
@@ -53,13 +54,18 @@ pub async fn dcds_reg_manage(
     uid_hasher.update(&(rng.gen::<[u8; 32]>()));
     let uid_str = uid_hasher.finalize().encode_hex::<String>();
 
+    //获取请求头中的uuid
+    let http_head = req_head.headers();
+    let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
+    let head_str = head_value.to_str().unwrap();
+
     //数据库存储操作
     //状态值
     let state = String::from("begin");
     let insert_statement = match conn
         .prepare(
-            "INSERT INTO agents (id, cert, extra, state, type, create_time, update_time) VALUES ($1,
-                $2, $3, $4, $5, now(), now())",
+            "INSERT INTO agents (id, cert, extra, state, type, cloud_user_id, create_time, update_time) VALUES ($1,
+                $2, $3, $4, $5, $6, now(), now())",
         )
         .await
     {
@@ -77,7 +83,7 @@ pub async fn dcds_reg_manage(
     match conn
         .execute(
             &insert_statement,
-            &[&uid_str, &qstr.cert, &qstr.extra, &state, &qstr.t],
+            &[&uid_str, &qstr.cert, &qstr.extra, &state, &qstr.t, &head_str],
         )
         .await
     {
@@ -113,9 +119,15 @@ pub struct QuotaManageRequest {
 pub async fn new_quota_manage(
     data: web::Data<Pool>,
     qstr: web::Json<QuotaManageRequest>,
+    req_head: HttpRequest,
 ) -> impl Responder {
     //数据库连接请求句柄获取
     let conn = data.get().await.unwrap();
+
+    //获取请求头中的uuid
+    let http_head = req_head.headers();
+    let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
+    let head_str = head_value.to_str().unwrap();
 
     //用于二次sm3的时间戳
     let local_time = Local::now();
@@ -145,7 +157,7 @@ pub async fn new_quota_manage(
     let insert_statement = match conn
         .prepare(
             "INSERT INTO quota_admin (id, aid, extra, value, type, state, create_time,
-                update_time) VALUES ($1, $2, $3, $4, $5, $6, now(), now())",
+                update_time) VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())",
         )
         .await
     {
@@ -170,6 +182,7 @@ pub async fn new_quota_manage(
                 &qstr.value,
                 &qstr.ttype,
                 &state,
+                &head_str
             ],
         )
         .await
@@ -201,7 +214,14 @@ pub async fn get_dcds_allquota(
     data: web::Data<Pool>,
     config: web::Data<ConfigPath>,
     qstr: web::Json<DcdsQuotaRequest>,
+    req_head: HttpRequest,
 ) -> impl Responder {
+
+    //获取请求头中的uuid
+    let http_head = req_head.headers();
+    let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
+    let head_str = head_value.to_str().unwrap();
+
     //连接到数据库获取连接句柄
     let conn = data.get().await.unwrap();
     let mut rng = thread_rng();
@@ -256,7 +276,7 @@ pub async fn get_dcds_allquota(
     let cert = issue_quota.get_cert().as_ref().unwrap();
     let cert_str = cert.to_bytes().encode_hex::<String>();
     let select_statement = match conn
-        .query("SELECT * from agents where cert = $1", &[&cert_str])
+        .query("SELECT * from agents where cert = $1 and cloud_user_id = $2", &[&cert_str,&head_str])
         .await
     {
         Ok(row) => {
@@ -299,8 +319,8 @@ pub async fn get_dcds_allquota(
     //将数据插入数据库
     let insert_statement = match conn
         .prepare(
-            "INSERT INTO quota_delivery (id, aid, issue, issue_info, create_time, update_time) VALUES 
-            ($1, $2, $3, $4, now(), now())",
+            "INSERT INTO quota_delivery (id, aid, issue, issue_info, cloud_user_id, create_time, update_time) VALUES 
+            ($1, $2, $3, $4, $5, now(), now())",
         ).await{
             Ok(s) => {
                 info!("database command success!");
@@ -314,7 +334,7 @@ pub async fn get_dcds_allquota(
     match conn
         .execute(
             &insert_statement,
-            &[&uid_str, &aid, &qstr.issue, &jsonb_issue],
+            &[&uid_str, &aid, &qstr.issue, &jsonb_issue, &head_str],
         )
         .await
     {

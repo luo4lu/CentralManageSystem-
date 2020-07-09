@@ -1,5 +1,5 @@
 use crate::response::ResponseBody;
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 //数据库相关
@@ -18,7 +18,12 @@ pub struct QuotaApproveRequest {
 pub async fn chang_quota_state(
     data: web::Data<Pool>,
     qstr: web::Json<QuotaApproveRequest>,
+    req_head: HttpRequest,
 ) -> impl Responder {
+    //获取请求头中的uuid
+    let http_head = req_head.headers();
+    let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
+    let head_str = head_value.to_str().unwrap();
     //连接数据库句柄
     let conn = data.get().await.unwrap();
     //state值判断
@@ -34,8 +39,8 @@ pub async fn chang_quota_state(
     //修改数据表的值得状态
     match conn
         .query(
-            "UPDATE quota_admin SET extra = $1,state = $2,update_time = now() where aid = $3",
-            &[&qstr.extra, &qstr.state, &qstr.aid],
+            "UPDATE quota_admin SET extra = $1,state = $2,update_time = now() where aid = $3 and cloud_user_id = $4",
+            &[&qstr.extra, &qstr.state, &qstr.aid, &head_str],
         )
         .await
     {
@@ -71,7 +76,12 @@ pub struct StatesRespones {
 pub async fn get_quota_type(
     data: web::Data<Pool>,
     req: web::Query<StatesRequest>,
+    req_head: HttpRequest,
 ) -> impl Responder {
+    //获取请求头中的uuid
+    let http_head = req_head.headers();
+    let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
+    let head_str = head_value.to_str().unwrap();
     //连接数据库句柄
     let conn = data.get().await.unwrap();
     let mut tatol: i64 = 0; //总额度（额度管理表中状态为delivery的value和）
@@ -88,8 +98,8 @@ pub async fn get_quota_type(
         //总额度查询
         _select_tatol = match conn
             .query(
-                "SELECT value from quota_admin where aid = $1 AND type = $2",
-                &[&req.aid, &type_delive],
+                "SELECT value from quota_admin where aid = $1 AND type = $2 AND cloud_user_id = $3",
+                &[&req.aid, &type_delive, &head_str],
             )
             .await
         {
@@ -111,8 +121,8 @@ pub async fn get_quota_type(
         //已发额度查询
         _select_issued = match conn
             .query(
-                "SELECT (issue_info->'t_obj'->'issue_info') from quota_delivery where aid = $1",
-                &[&req.aid],
+                "SELECT (issue_info->'t_obj'->'issue_info') from quota_delivery where aid = $1 and cloud_user_id = $2",
+                &[&req.aid, &head_str],
             )
             .await
         {
@@ -134,8 +144,8 @@ pub async fn get_quota_type(
         //回收额度
         _select_recycle = match conn
             .query(
-                "SELECT value from quota_admin where aid = $1 AND type = $2",
-                &[&req.aid, &type_with],
+                "SELECT value from quota_admin where aid = $1 AND type = $2 AND cloud_user_id = $3",
+                &[&req.aid, &type_with, &head_str],
             )
             .await
         {
@@ -158,8 +168,8 @@ pub async fn get_quota_type(
         //总额度查询
         _select_tatol = match conn
             .query(
-                "SELECT value from quota_admin where type = $1",
-                &[&type_delive],
+                "SELECT value from quota_admin where type = $1 AND cloud_user_id = $2",
+                &[&type_delive, &head_str],
             )
             .await
         {
@@ -181,8 +191,8 @@ pub async fn get_quota_type(
         //已发额度查询
         _select_issued = match conn
             .query(
-                "SELECT (issue_info->'t_obj'->'issue_info') from quota_delivery where $1 !='' ",
-                &[&"aid"],
+                "SELECT (issue_info->'t_obj'->'issue_info') from quota_delivery where $1 !='' AND cloud_user_id = $2",
+                &[&"aid", &head_str],
             )
             .await
         {
@@ -204,8 +214,8 @@ pub async fn get_quota_type(
         //回收额度
         _select_recycle = match conn
             .query(
-                "SELECT value from quota_admin where type = $1",
-                &[&type_with],
+                "SELECT value from quota_admin where type = $1 AND cloud_user_id = $2",
+                &[&type_with, &head_str],
             )
             .await
         {
