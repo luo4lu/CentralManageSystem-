@@ -2,6 +2,7 @@ use actix_cors::Cors;
 use actix_web::{App, HttpServer};
 use clap::ArgMatches;
 use log::Level;
+use std::env;
 
 mod config;
 mod config_command;
@@ -12,6 +13,7 @@ pub mod response;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
+    let args: Vec<String> = env::args().collect();
     //Initialize the log and set the print level
     simple_logger::init_with_level(Level::Warn).unwrap();
 
