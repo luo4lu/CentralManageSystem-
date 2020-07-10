@@ -1,6 +1,6 @@
 use crate::config::ConfigPath;
 use crate::response::ResponseBody;
-use actix_web::{post, web, HttpResponse, HttpRequest, Responder};
+use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
 use asymmetric_crypto::hasher::sha3::Sha3;
 use asymmetric_crypto::hasher::sm3::Sm3;
 use asymmetric_crypto::keypair;
@@ -83,7 +83,14 @@ pub async fn dcds_reg_manage(
     match conn
         .execute(
             &insert_statement,
-            &[&uid_str, &qstr.cert, &qstr.extra, &state, &qstr.t, &head_str],
+            &[
+                &uid_str,
+                &qstr.cert,
+                &qstr.extra,
+                &state,
+                &qstr.t,
+                &head_str,
+            ],
         )
         .await
     {
@@ -156,7 +163,7 @@ pub async fn new_quota_manage(
     }
     let insert_statement = match conn
         .prepare(
-            "INSERT INTO quota_admin (id, aid, extra, value, type, state, create_time,
+            "INSERT INTO quota_admin (id, aid, extra, value, type, state, cloud_user_id, create_time,
                 update_time) VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())",
         )
         .await
@@ -182,7 +189,7 @@ pub async fn new_quota_manage(
                 &qstr.value,
                 &qstr.ttype,
                 &state,
-                &head_str
+                &head_str,
             ],
         )
         .await
@@ -216,7 +223,6 @@ pub async fn get_dcds_allquota(
     qstr: web::Json<DcdsQuotaRequest>,
     req_head: HttpRequest,
 ) -> impl Responder {
-
     //获取请求头中的uuid
     let http_head = req_head.headers();
     let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
@@ -276,7 +282,10 @@ pub async fn get_dcds_allquota(
     let cert = issue_quota.get_cert().as_ref().unwrap();
     let cert_str = cert.to_bytes().encode_hex::<String>();
     let select_statement = match conn
-        .query("SELECT * from agents where cert = $1 and cloud_user_id = $2", &[&cert_str,&head_str])
+        .query(
+            "SELECT * from agents where cert = $1 and cloud_user_id = $2",
+            &[&cert_str, &head_str],
+        )
         .await
     {
         Ok(row) => {
