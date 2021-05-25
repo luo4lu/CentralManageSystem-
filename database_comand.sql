@@ -1,4 +1,4 @@
-create database test_centralmanagesystem;
+create database centralmanagesystem;
 
 create table agents(
     id varchar(255) PRIMARY KEY NOT NULL,

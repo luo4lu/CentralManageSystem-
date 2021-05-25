@@ -56,7 +56,7 @@ pub async fn dcds_reg_manage(
 
     //获取请求头中的uuid
     let http_head = req_head.headers();
-    let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
+    let head_value = http_head.get("X-USERID").unwrap();
     let head_str = head_value.to_str().unwrap();
 
     //数据库存储操作
@@ -133,7 +133,7 @@ pub async fn new_quota_manage(
 
     //获取请求头中的uuid
     let http_head = req_head.headers();
-    let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
+    let head_value = http_head.get("X-USERID").unwrap();
     let head_str = head_value.to_str().unwrap();
 
     //用于二次sm3的时间戳
@@ -225,7 +225,7 @@ pub async fn get_dcds_allquota(
 ) -> impl Responder {
     //获取请求头中的uuid
     let http_head = req_head.headers();
-    let head_value = http_head.get("X-CLOUD-USER_ID").unwrap();
+    let head_value = http_head.get("X-USERID").unwrap();
     let head_str = head_value.to_str().unwrap();
 
     //连接到数据库获取连接句柄
